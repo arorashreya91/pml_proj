@@ -1,0 +1,76 @@
+Practical Machine Learning Project
+==================================
+We have to quantify how much of a particular activity they do, but they rarely quantify how well they do it. Our goal is to do that.
+
+Load the data and split to training and validation datasets.
+# load the testing set
+# Note: the testing set is not used in this analysis
+# the set is only used for the second part of the assignment
+# when the model is used to predict the classes
+
+```{r}
+training.file <- 'pml-training.csv'
+test.file     <- 'pml-testing.csv'
+```
+
+```{r}
+read.pml       <- function(x) { read.csv(x, na.strings = c("", "NA", "#DIV/0!") ) }
+training       <- read.pml(training.file)
+test           <- read.pml(test.file)
+training       <- training[,-c(1,5,6)]
+test           <- test[,-c(1,5,6)]
+```
+
+
+```{r}
+library(caret)
+trainingIndex  <- createDataPartition(training$classe, p=.50, list=FALSE)
+training.train <- training[ trainingIndex,]
+training.test  <- training[-trainingIndex,]
+```
+
+Some variable have near Zero variance which indicates that 
+they do not contribute (enough) to the model.
+They are removed from the set.
+
+```{r}
+rm.na.cols     <- function(x) { x[ , colSums( is.na(x) ) < nrow(x) ] }
+training.train <- rm.na.cols(training.train)
+training.test  <- rm.na.cols(training.test)
+complete       <- function(x) {x[,sapply(x, function(y) !any(is.na(y)))] }
+incompl        <- function(x) {names( x[,sapply(x, function(y) any(is.na(y)))] ) }
+trtr.na.var    <- incompl(training.train)
+trts.na.var    <- incompl(training.test)
+training.train <- complete(training.train)
+training.test  <- complete(training.test)
+```
+A number of variable contain (a lot of) NA's.
+Leaving them in the set not only makes the model creation slower, but also results in lower accuracy in the model.
+
+## Method
+We use the **Random Forests** method
+
+```{r}
+library(randomForest)
+```
+We can now create a model based on the pre-processed data set. 
+Note that at this point, we are still working with a large set of variables.
+We do have however a reduced number of rows.
+
+```{r}
+random.forest <- train(training.train[,-57],
+                       training.train$classe,
+                       tuneGrid=data.frame(mtry=3),
+                       trControl=trainControl(method="none")
+                       )
+```
+
+### Expected out of sample error
+We can calculate the expected out of sample error based on the test set that we created for cross-validation:
+
+```{r}
+confusionMatrix(predict(random.forest,
+                        newdata=training.test[,-57]),
+                training.test$classe
+                )
+```
